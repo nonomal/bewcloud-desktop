@@ -1,54 +1,56 @@
 # bewCloud Desktop Sync
 
-[![](https://github.com/bewcloud/bewcloud-desktop/workflows/Run%20Tests/badge.svg)](https://github.com/bewcloud/bewcloud-desktop/actions?workflow=Run+Tests)
+> [!IMPORTANT]
+> 
+> The native desktop app is no longer built/maintained, and instead now I only provide some commands here, which use `rclone` to sync the directories (the app already used that). This is simpler and safer, to be honest.
+>
+> If you're looking for the last working version of the desktop app, it's at the [v0.0.5 release](https://github.com/bewcloud/bewcloud-desktop/releases/tag/v0.0.5) or [this commit](https://github.com/bewcloud/bewcloud-desktop/tree/585620e5017f43680265fd9a790e04f54b4c7e47).
+>
+> If you're looking for the last failed attempt to upgrade it to Tauri v2, check [this PR](https://github.com/bewcloud/bewcloud-desktop/pull/4).
 
-This is the Desktop Sync client for [bewCloud](https://github.com/bewcloud/bewcloud). It is built with [`Tauri`](https://tauri.app) and relies on [`rclone`](https://rclone.org), which relies on [`rsync`](https://rsync.samba.org).
+If you'd like to keep a local directory in sync with a bewCloud instance, these are the recommended commands. They rely on [`rclone`](https://rclone.org), which relies on [`rsync`](https://rsync.samba.org).
 
-Usernames, passwords, and sync is all handled by `rclone`. The connection to a bewCloud instance happens via HTTP and a remote via WebDav is created in `rclone`.
-
-The app runs `rclone bisync` every five minutes, or when it's forced to do so.
+Usernames, passwords, and sync are all handled by `rclone`. The connection to a bewCloud instance happens via HTTP and a remote via WebDav is created in `rclone`.
 
 If you're looking for the mobile app, it's at [`bewcloud-mobile`](https://github.com/bewcloud/bewcloud-mobile).
 
 ## Install
 
-You need to have [`rclone`](https://rclone.org) installed in your computer, as the app makes a shell call to that command. If you already have configured remotes they won't show up (unless you manually edit the `<AppDataDir>/config.json`), but bewCloud will not affect them (new ones will be created and also shown by the app).
+1. Install `rclone` from the [official website](https://rclone.org/install/).
+2. Setup your bewCloud remote: `rclone config create "bewcloud" webdav vendor=fastmail` and provide your bewCloud DAV URL, username/email, and DAV password.
+3. Create your local "root directory" to sync (optional, but recommended): `mkdir -p /home/user/bewcloud`
+4. Per remote directory you want to sync, run the first sync: `rclone bisync -vc "bewcloud:/<remote-directory>/" "/home/user/bewcloud/<local-directory>" --resync`
 
 > [!NOTE]
-> If you use a password to encrypt the `rclone` config file, [you need to have set `RCLONE_CONFIG_PASS` for your user, "globally"](https://rclone.org/docs/#other-environment-variables).
+>
+> Some people have had issues with synchronizing empty directories. If you're having issues, you can try adding `--create-empty-src-dirs` to the sync command in number 4 and below.
 
-Then, download the appropriate binary [from the releases page](https://github.com/bewcloud/bewcloud-desktop/releases) for your OS and run it!
+## Sync / Cron
 
-Alternatively, you can [build from source](#build-from-source)!
+Assuming you want to run the sync every hour, you can use the following cron job, per directory: `0 * * * * rclone bisync -vc "bewcloud:/<remote-directory>/" "/home/user/bewcloud/<local-directory>"`
 
-## Development
-
-You need to have [Tauri's dependencies](https://tauri.app/v1/guides/getting-started/prerequisites#installing) installed.
-
-Also, run `rustup component add rustfmt` so `make format` can also format the `rust` code.
+Alternatively, if you'd like to run the sync ad-hoc and keep some log to track things, you can create a file like `sync-bewcloud.sh` with all the directories you want to sync:
 
 ```sh
-$ make install # installs module dependendies
-$ make start # runs the app
-$ make format # formats the code
-$ make test # runs tests
+#!/bin/sh
+rclone bisync -vc "bewcloud:/<remote-directory-1>/" "/home/user/bewcloud/<local-directory-1>"
+rclone bisync -vc "bewcloud:/<remote-directory-2>/" "/home/user/bewcloud/<local-directory-2>"
 ```
 
-## Build from source
+And then your crontab can be `0 * * * * /home/user/sync-bewcloud.sh > /home/user/sync-bewcloud.log 2>&1`
 
-Don't forget to check the [development](#development) section above first!
+And you can simply run `./sync-bewcloud.sh` to sync the directories and check the output.
 
-> [!NOTE]
-> If you're releasing a new version, update it in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `package.json` first.
+## Uninstall / Remove
 
-```sh
-$ make build # builds the app binaries!
-```
+To uninstall/remove these sync scripts, you can delete the `rclone` config file for bewcloud (`rclone config delete bewcloud`), and remove the crons.
 
-## TODOs:
+## Migrating from the desktop app
 
-- [ ] Build binaries for Arch and RPM too (https://github.com/0-don/clippy/blob/master/.github/workflows/release.yml)
-- [ ] Create release with signed builds on tag push
-- [ ] Actually check and delete local directory's remote directories when they're removed
-- [ ] Actually delete local directory when a remote is removed (code is commented)
-- [ ] Implement directory watching (kind of complicated right now as `notify` or `hotwatch` get their watchers destroyed after Tauri's setup)
+You should only have to follow the sync/cron section above.
+
+You should also remove the app. If it's not deleted, you can delete the `<AppDataDir>/config.json` file, which isn't necessary or used by `rclone`.
+
+## I _really_ want a desktop app, though
+
+I'm sorry, but there's not enough incentive for me to keep maintaining a native desktop app. I've heard great things about [PhotoSync](https://www.photosync-app.com/home), though I haven't used it myself. Any WebDav client should work, and if it doesn't, feel free to open an issue at [`bewcloud/bewcloud`](https://github.com/bewcloud/bewcloud).
